@@ -9,6 +9,7 @@ interface Profile {
   username: string;
   full_name: string;
   balance: number;
+  mobile_money_number?: string;
 }
 
 interface Live {
@@ -556,6 +557,7 @@ function App() {
                   <div key={p.id} className="user-admin-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <div>
                       <div style={{ fontWeight: 700 }}>{p.full_name}</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>{p.mobile_money_number || 'Numéro non renseigné'}</div>
                       <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Solde actuel: <span style={{ color: 'var(--success)', fontWeight: 800 }}>{p.balance.toLocaleString()} FTSY</span></div>
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
@@ -564,7 +566,7 @@ function App() {
                         style={{ padding: '5px 10px', fontSize: '0.8rem' }}
                         onClick={() => {
                           const amt = prompt(`Ajouter au solde de ${p.full_name} (FTSY):`, "1000");
-                          if (amt) updateUserBalance(p.id, p.balance + Number(amt));
+                          if (amt)updateUserBalance(p.id, p.balance + Number(amt));
                         }}
                       >
                         + AJOUTER
@@ -574,7 +576,7 @@ function App() {
                         style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--meron)' }}
                         onClick={() => {
                           const amt = prompt(`Retirer du solde de ${p.full_name} (FTSY):`, "1000");
-                          if (amt) updateUserBalance(p.id, p.balance - Number(amt));
+                          if (amt)updateUserBalance(p.id, p.balance - Number(amt));
                         }}
                       >
                         - RETIRER
