@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import FBPlayer from './components/FBPlayer';
-import { Wallet, LogOut, Swords, Send, User, Activity, Coins, Mail, Lock, Phone, ArrowRight, ShieldCheck, Zap, Trophy, Clock, CheckCircle2, History } from 'lucide-react';
+import { Wallet, LogOut, Swords, Send, User, Activity, Coins, Mail, Lock, Phone, ArrowRight, ArrowLeft, ShieldCheck, Zap, Trophy, Clock, CheckCircle2, History } from 'lucide-react';
 import './App.css';
 
 interface Profile {
@@ -332,9 +332,14 @@ function App() {
         return;
       }
 
-      await supabase.from('lives').update({ status: 'finished', winner }).eq('id', liveId);
+      // 1. Marquer comme terminé dans la DB
+      const { error: updateError } = await supabase.from('lives').update({ status: 'finished', winner }).eq('id', liveId);
+      if (updateError) throw updateError;
 
-      // 2. Traiter les paris ACCEPTÉS (Gagnants / Perdants / Égalité)
+      // 2. Mettre à jour l'interface LOCALEMENT immédiatement (Disparition visuelle)
+      setLives(prev => prev.filter(l => l.id !== liveId));
+
+      // 3. Traiter les paris ACCEPTÉS
       const { data: bets } = await supabase.from('bets')
         .select('*')
         .eq('live_id', liveId)
@@ -342,32 +347,25 @@ function App() {
 
       if (bets) {
         for (const bet of bets) {
-          // DOUBLE SÉCURITÉ : On change le statut du pari AVANT de donner l'argent
-          // Si l'update échoue (pari déjà settled), on ne donne pas l'argent.
           const { data: lockedBet } = await supabase.from('bets')
             .update({ status: 'settled' })
             .eq('id', bet.id)
-            .eq('status', 'accepted') // Condition critique pour éviter les doublons
+            .eq('status', 'accepted')
             .select();
 
           if (lockedBet && lockedBet.length > 0) {
             if (winner === 'draw') {
-              // Égalité : Remboursement strict des deux mises
               await supabase.rpc('increment_balance', { user_id: bet.user_id, amount: bet.amount });
               await supabase.rpc('increment_balance', { user_id: bet.opponent_id, amount: bet.target_amount });
             } else {
-              // Victoire : Déterminer le seul gagnant
               const winnerId = (bet.side === winner) ? bet.user_id : bet.opponent_id;
-              const winnings = bet.amount + bet.target_amount;
-              
-              // Crédit direct au gagnant
-              await supabase.rpc('increment_balance', { user_id: winnerId, amount: winnings });
+              await supabase.rpc('increment_balance', { user_id: winnerId, amount: bet.amount + bet.target_amount });
             }
           }
         }
       }
 
-      // 3. Rembourser les paris en ATTENTE (Sans adversaire)
+      // 4. Rembourser les paris en ATTENTE
       const { data: pending } = await supabase.from('bets')
         .select('*')
         .eq('live_id', liveId)
@@ -387,11 +385,15 @@ function App() {
         }
       }
 
-      alert("SUCCÈS : Combat clôturé et soldes mis à jour en toute sécurité.");
-      fetchLives();
-      fetchFinishedLives();
-      fetchLeaderboard();
-      fetchAllProfiles();
+      // 5. Rafraîchir tout
+      await Promise.all([
+        fetchLives(),
+        fetchFinishedLives(),
+        fetchLeaderboard(),
+        fetchAllProfiles()
+      ]);
+      
+      alert(`COMBAT CLÔTURÉ : Vainqueur ${winner.toUpperCase()}. Gains distribués.`);
       setView('results');
     } catch (err: any) {
       alert("Erreur Critique : " + err.message);
@@ -421,22 +423,69 @@ function App() {
           <>
             {/* Section Clôture de Combat */}
             {!editingLive && lives.length > 0 && (
-              <div className="admin-actions-box" style={{ marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '15px' }}>
-                <h3 style={{ marginBottom: '15px', color: 'var(--primary)' }}>CLÔTURER UN COMBAT EN COURS</h3>
-                <div className="lives-admin-list">
+              <div className="admin-actions-box" style={{ marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '25px', borderRadius: '20px', border: '1px solid rgba(255,71,87,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ width: '12px', height: '12px', background: 'var(--primary)', borderRadius: '50%', animation: 'blink 1s infinite' }}></div>
+                  <h3 style={{ color: 'var(--primary)', margin: 0, fontSize: '1.1rem', textTransform: 'uppercase' }}>COMBATS EN DIRECT ({lives.length})</h3>
+                </div>
+                
+                <div className="lives-admin-list" style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '10px' }}>
                   {lives.map(live => (
-                    <div key={live.id} className="live-admin-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '10px', marginBottom: '10px' }}>
+                    <div key={live.id} className="live-admin-item" style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr auto', 
+                      gap: '15px', 
+                      alignItems: 'center', 
+                      background: 'rgba(0,0,0,0.4)', 
+                      padding: '20px', 
+                      borderRadius: '16px', 
+                      marginBottom: '12px',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      transition: '0.3s'
+                    }}>
                       <div>
-                        <strong>{live.title}</strong>
-                        <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{live.team_a} VS {live.team_b}</div>
+                        <div style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>ID: {live.id.slice(0,8)}</div>
+                        <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '8px' }}>{live.title}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                          <span style={{ color: 'var(--meron)', fontWeight: 700 }}>{live.team_a}</span>
+                          <span style={{ opacity: 0.3, fontWeight: 900 }}>VS</span>
+                          <span style={{ color: 'var(--wala)', fontWeight: 700 }}>{live.team_b}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button className="btn-accept-lite" style={{ background: 'var(--meron)', padding: '8px 15px' }} onClick={() => finishLive(live.id, 'meron')}>MÉRON</button>
-                        <button className="btn-accept-lite" style={{ background: 'var(--wala)', padding: '8px 15px' }} onClick={() => finishLive(live.id, 'wala')}>WALA</button>
-                        <button className="btn-accept-lite" style={{ background: 'var(--accent)', color: 'black', padding: '8px 15px' }} onClick={() => finishLive(live.id, 'draw')}>ÉGAL</button>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            className="btn-accept-lite" 
+                            style={{ background: 'var(--meron)', padding: '10px 15px', flex: 1, minWidth: '80px' }} 
+                            onClick={() => finishLive(live.id, 'meron')}
+                            disabled={loading}
+                          >
+                            MÉRON
+                          </button>
+                          <button 
+                            className="btn-accept-lite" 
+                            style={{ background: 'var(--wala)', padding: '10px 15px', flex: 1, minWidth: '80px' }} 
+                            onClick={() => finishLive(live.id, 'wala')}
+                            disabled={loading}
+                          >
+                            WALA
+                          </button>
+                        </div>
+                        <button 
+                          className="btn-accept-lite" 
+                          style={{ background: 'var(--accent)', color: 'black', padding: '10px', width: '100%' }} 
+                          onClick={() => finishLive(live.id, 'draw')}
+                          disabled={loading}
+                        >
+                          ÉGALITÉ / ANNULER
+                        </button>
                       </div>
                     </div>
                   ))}
+                </div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.5, textAlign: 'center', marginTop: '10px' }}>
+                  Cliquez sur un vainqueur pour clôturer et distribuer les gains automatiquement.
                 </div>
               </div>
             )}
@@ -623,6 +672,22 @@ function App() {
   const renderAuth = (type: 'login' | 'register') => (
     <div className="auth-wrapper">
       <div className="auth-card">
+        <button 
+          onClick={() => setView('home')} 
+          className="btn-select" 
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            marginBottom: '20px',
+            background: 'transparent',
+            border: 'none',
+            padding: '0',
+            opacity: 0.7
+          }}
+        >
+          <ArrowLeft size={18} /> RETOUR
+        </button>
         <div className="auth-header">
           <h2>{type === 'login' ? 'RETOUR DANS L\'ARENA' : 'REJOINDRE LE COMBAT'}</h2>
           <p>{type === 'login' ? 'Entrez vos accès' : 'Créez votre profil'}</p>

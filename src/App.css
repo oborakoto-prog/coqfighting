@@ -697,9 +697,10 @@ body {
 
 /* --- Lives Grid --- */
 .lives-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  width: 100%;
 }
 
 .video-evolution-frame {
@@ -712,19 +713,24 @@ body {
 .video-inner-container {
   position: relative;
   width: 100%;
-  /* Suppression de toute contrainte de ratio pour laisser FB s'afficher naturellement */
-  height: auto;
-  min-height: 200px;
-  overflow: visible; /* On laisse déborder si nécessaire pour ne rien couper */
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .video-inner-container {
+    min-height: 580px;
+  }
+}
+
+@media (max-width: 768px) {
+  .video-inner-container {
+    aspect-ratio: 16 / 9;
+  }
 }
 
 .fb-iframe {
-  /* On retire le position absolute pour que l'iframe puisse s'étendre verticalement selon le contenu FB */
-  position: relative;
-  width: 100%;
-  height: auto;
-  min-height: 480px; /* Hauteur minimale confortable */
-  aspect-ratio: auto;
   transition: opacity 0.5s;
   display: block;
   border: none;
