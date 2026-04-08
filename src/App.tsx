@@ -191,12 +191,21 @@ function App() {
   };
 
   const fetchRequests = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('bets')
-      .select('*, profiles!user_id(full_name), lives!live_id(team_a, team_b, winner)')
+      .select(`
+        *,
+        profiles:user_id (full_name),
+        lives:live_id (team_a, team_b, winner)
+      `)
       .in('status', ['pending', 'accepted', 'settled'])
       .order('created_at', { ascending: false });
-    if (data) setRequests(data as any);
+    
+    if (error) {
+      console.error("Erreur de récupération des défis:", error);
+    } else if (data) {
+      setRequests(data as any);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
