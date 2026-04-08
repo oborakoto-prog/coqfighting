@@ -181,7 +181,7 @@ function App() {
   };
 
   const fetchFinishedLives = async () => {
-    const { data } = await supabase.from('lives').select('*').eq('status', 'finished').order('created_at', { ascending: false }).limit(20);
+    const { data } = await supabase.from('lives').select('id, title, fb_url, team_a, team_b, status, custom_top, custom_zoom, created_at').eq('status', 'finished').order('created_at', { ascending: false }).limit(20);
     if (data) setFinishedLives(data);
   };
 
@@ -196,7 +196,7 @@ function App() {
       .select(`
         *,
         profiles:user_id (full_name),
-        lives:live_id (team_a, team_b, winner)
+        lives:live_id (team_a, team_b)
       `)
       .in('status', ['pending', 'accepted', 'settled'])
       .order('created_at', { ascending: false });
@@ -342,7 +342,7 @@ function App() {
       }
 
       // 1. Marquer comme terminé dans la DB
-      const { error: updateError } = await supabase.from('lives').update({ status: 'finished', winner }).eq('id', liveId);
+      const { error: updateError } = await supabase.from('lives').update({ status: 'finished' }).eq('id', liveId);
       if (updateError) throw updateError;
 
       // 2. Mettre à jour l'interface LOCALEMENT immédiatement (Disparition visuelle)
