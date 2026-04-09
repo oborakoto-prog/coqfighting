@@ -219,7 +219,9 @@ function App() {
     });
     if (error) alert(error.message);
     else if (data.user) {
-      alert("Inscription réussie !");
+      // Initial balance for tests: 100,000 FTSY
+      await supabase.from('profiles').update({ balance: 100000 }).eq('id', data.user.id);
+      alert("Inscription réussie ! Un solde de 100 000 FTSY vous a été offert.");
       setView('arena');
     }
     setLoading(false);
